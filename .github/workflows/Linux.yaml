@@ -1,18 +1,14 @@
-name: Linux Desktop Headless via Tailscale
+name: Linux Desktop Headless via Tailscale (VNC)
 
 on:
   workflow_dispatch:
     inputs:
       ts_authkey:
-        description: "Tailscale auth key (ephemeral recomendado)"
+        description: "Tailscale auth key (recomendo ephemeral)"
         required: true
 
-concurrency:
-  group: tailscale-linux-gui
-  cancel-in-progress: false
-
 jobs:
-  linux-gui:
+  linux-vnc:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
 
@@ -26,14 +22,13 @@ jobs:
           sudo chown bullet:bullet /home/bullet
           sudo chmod 755 /home/bullet
 
-      - name: 🖥️ Install XFCE, Xvfb, VNC & browser
+      - name: 🖥️ Install XFCE, Xvfb and x11vnc
         run: |
           sudo apt update
           sudo DEBIAN_FRONTEND=noninteractive apt install -y \
-            xfce4 xfce4-goodies x11vnc xvfb dbus-x11 novnc websockify \
-            firefox
+            xfce4 xfce4-goodies x11vnc xvfb dbus-x11
 
-      - name: 🔗 Start headless XFCE in Xvfb
+      - name: 🔗 Start headless XFCE in virtual display
         run: |
           export DISPLAY=:1
           Xvfb :1 -screen 0 1920x1080x24 &
@@ -43,34 +38,8 @@ jobs:
           echo "startxfce4" | sudo tee /home/bullet/.xsession
           sudo chown bullet:bullet /home/bullet/.xsession
 
-      - name: 🔗 Start x11vnc & noVNC
+      - name: 🔗 Start x11vnc (VNC access)
         run: |
           export DISPLAY=:1
+          # -shared permite múltiplos clientes conectarem
           x11vnc -display :1 -nopw -forever -shared -rfbport 5900 &
-          websockify --web=/usr/share/novnc 6080 localhost:5900 &
-
-      - name: 🔗 Install & connect Tailscale
-        shell: bash
-        run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up \
-            --authkey ${{ inputs.ts_authkey }} \
-            --hostname bullet-linux \
-            --accept-dns=false
-
-          # Espera Tailscale inicializar IP
-          sleep 5
-          IP=$(tailscale ip -4 | head -n1)
-
-          echo "Use este IP para acessar:"
-          echo "VNC: $IP:5900"
-          echo "noVNC (browser): http://$IP:6080"
-          echo "Usuário Linux: bullet"
-          echo "Senha Linux: Bullet@12345"
-
-          # ✅ GitHub Actions summary compatível 100%
-          printf "### Linux Headless via Tailscale\nVNC: %s:5900\nnoVNC: http://%s:6080\nUsuário: bullet\nSenha: Bullet@12345\n" "$IP" "$IP" >> $GITHUB_STEP_SUMMARY
-
-      - name: ⏳ Keep alive
-        run: |
-          sleep 21500
