@@ -26,7 +26,7 @@ concurrency:
 jobs:
   linux-vnc:
     runs-on: ubuntu-22.04
-    timeout-minutes: 360
+    timeout-minutes: 370
 
     env:
       USERNAME: bullet
@@ -52,45 +52,43 @@ jobs:
             xfce4 xfce4-goodies x11vnc xvfb dbus-x11 novnc websockify \
             firefox
 
-      - name: ❌ Stop RDP (avoid conflicts)
+      - name: 🔗 Start Linux desktop + VNC + noVNC
         run: |
-          sudo systemctl stop xrdp || true
-          sudo systemctl disable xrdp || true
-
-      - name: 🔗 Start headless XFCE + VNC + noVNC
-        run: |
+          # Export display virtual
           export DISPLAY=:$DISPLAY_NUM
-
-          # Start Xvfb virtual display
+          
+          # Inicia Xvfb
           Xvfb :$DISPLAY_NUM -screen 0 1920x1080x24 &
-          sleep 3
-
-          # Start XFCE desktop
-          startxfce4 &
+          sleep 2
+          
+          # Inicia XFCE nesse display
+          sudo -u $USERNAME startxfce4 &
           sleep 5
-
-          # Create .xsession
+          
+          # Configura .xsession
           echo "startxfce4" | sudo tee /home/$USERNAME/.xsession
           sudo chown $USERNAME:$USERNAME /home/$USERNAME/.xsession
 
-          # Start x11vnc for VNC clients
+          # Inicia x11vnc para múltiplos clientes
           x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport $VNC_PORT &
-
-          # Start noVNC for browser access
+          
+          # Inicia noVNC para acesso via navegador
           websockify --web=/usr/share/novnc $NOVNC_PORT localhost:$VNC_PORT &
+          
+          # Espera 10s para garantir que tudo subiu
+          sleep 10
 
-          # Install & start Tailscale
+      - name: 🔗 Install & connect Tailscale
+        run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey ${{ inputs.ts_authkey }} --hostname bullet-linux --accept-dns=false
           sleep 5
-
           IP=$(tailscale ip -4 | head -n1)
-          echo "====================================="
-          echo "Use VNC (any client): $IP:$VNC_PORT"
-          echo "Use noVNC (browser): http://$IP:$NOVNC_PORT"
+          echo "Use este IP para acessar:"
+          echo "VNC (app): $IP:5900"
+          echo "noVNC (browser): http://$IP:6080"
           echo "Usuário Linux: $USERNAME"
           echo "Senha Linux: $PASSWORD"
-          echo "====================================="
 
       - name: ⏳ Keep alive
         run: |
