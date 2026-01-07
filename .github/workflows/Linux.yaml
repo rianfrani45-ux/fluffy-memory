@@ -1,10 +1,10 @@
-name: Linux Desktop via Tailscale
+name: Linux Desktop Headless via Tailscale
 
 on:
   workflow_dispatch:
     inputs:
       ts_authkey:
-        description: "Tailscale auth key"
+        description: "Tailscale auth key (ephemeral recomendado)"
         required: true
 
 concurrency:
@@ -17,28 +17,42 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: 🔧 Setup user (rápido e confiável)
+      - name: 🔧 Setup user (rápido)
         run: |
-          # Cria usuário 'bullet' com senha
           sudo adduser --disabled-password --gecos "" bullet
           echo "bullet:Bullet@12345" | sudo chpasswd
           sudo usermod -aG sudo bullet
+          sudo mkdir -p /home/bullet
+          sudo chown bullet:bullet /home/bullet
+          sudo chmod 755 /home/bullet
 
-      - name: 🖥️ Install XFCE + XRDP
+      - name: 🖥️ Install XFCE, Xvfb, VNC & browser
         run: |
           sudo apt update
           sudo DEBIAN_FRONTEND=noninteractive apt install -y \
-            xfce4 xfce4-goodies xrdp dbus-x11 firefox
+            xfce4 xfce4-goodies x11vnc xvfb dbus-x11 novnc websockify \
+            firefox
 
-          # Corrige sessão para XRDP funcionar
+      - name: 🔗 Start headless XFCE in Xvfb
+        run: |
+          # Cria display virtual :1
+          export DISPLAY=:1
+          Xvfb :1 -screen 0 1920x1080x24 &
+          sleep 2
+          # Inicia XFCE nesse display
+          startxfce4 &
+          sleep 5
+          # Cria arquivo .xsession para compatibilidade
           echo "startxfce4" | sudo tee /home/bullet/.xsession
           sudo chown bullet:bullet /home/bullet/.xsession
-          sudo chmod 644 /home/bullet/.xsession
 
-          # Configura XRDP para usar Xorg
-          sudo sed -i 's/^#\?port=.*/port=3389/' /etc/xrdp/xrdp.ini
-          sudo systemctl enable xrdp
-          sudo systemctl restart xrdp
+      - name: 🔗 Start x11vnc & noVNC
+        run: |
+          export DISPLAY=:1
+          # x11vnc para múltiplos clientes
+          x11vnc -display :1 -nopw -forever -shared -rfbport 5900 &
+          # noVNC para acesso via navegador na porta 6080
+          websockify --web=/usr/share/novnc 6080 localhost:5900 &
 
       - name: 🔗 Install & connect Tailscale
         run: |
@@ -48,8 +62,20 @@ jobs:
             --hostname bullet-linux \
             --accept-dns=false
 
-          echo "Use este IP para conectar via RDP:"
-          tailscale ip -4
+          # Exibe IP Tailscale
+          IP=$(tailscale ip -4)
+          echo "Use este IP para acessar:"
+          echo "VNC: $IP:5900"
+          echo "noVNC (browser): http://$IP:6080"
+          echo "Usuário Linux: bullet"
+          echo "Senha Linux: Bullet@12345"
+
+          # Adiciona info no summary do GitHub Actions
+          echo "### Linux Headless via Tailscale
+VNC: $IP:5900
+noVNC: http://$IP:6080
+Usuário: bullet
+Senha: Bullet@12345" | tee $GITHUB_STEP_SUMMARY
 
       - name: ⏳ Keep alive
         run: |
