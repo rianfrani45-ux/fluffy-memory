@@ -1,45 +1,95 @@
-name: Linux Desktop Headless via Tailscale (VNC)
+name: Linux Desktop via Tailscale (VNC)
 
 on:
   workflow_dispatch:
     inputs:
       ts_authkey:
-        description: "Tailscale auth key (recomendo ephemeral)"
+        description: "Tailscale auth key (ephemeral ou reutilizável)"
         required: true
+      test_mode:
+        description: "Run 5-minute test loop"
+        type: boolean
+        default: false
+      runtime_minutes:
+        description: "Runtime em minutos (max 360; default 355)"
+        required: false
+        default: "355"
+      loops:
+        description: "Quantas vezes reiniciar workflow (0 = infinito)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: tailscale-linux-vnc
+  cancel-in-progress: false
 
 jobs:
   linux-vnc:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
 
+    env:
+      USERNAME: bullet
+      PASSWORD: Bullet@12345
+      DISPLAY_NUM: 1
+      VNC_PORT: 5900
+      NOVNC_PORT: 6080
+
     steps:
       - name: 🔧 Setup user
         run: |
-          sudo adduser --disabled-password --gecos "" bullet
-          echo "bullet:Bullet@12345" | sudo chpasswd
-          sudo usermod -aG sudo bullet
-          sudo mkdir -p /home/bullet
-          sudo chown bullet:bullet /home/bullet
-          sudo chmod 755 /home/bullet
+          sudo adduser --disabled-password --gecos "" $USERNAME
+          echo "$USERNAME:$PASSWORD" | sudo chpasswd
+          sudo usermod -aG sudo $USERNAME
+          sudo mkdir -p /home/$USERNAME
+          sudo chown $USERNAME:$USERNAME /home/$USERNAME
+          sudo chmod 755 /home/$USERNAME
 
-      - name: 🖥️ Install XFCE, Xvfb and x11vnc
+      - name: 🖥️ Install XFCE, Xvfb, x11vnc, noVNC
         run: |
           sudo apt update
           sudo DEBIAN_FRONTEND=noninteractive apt install -y \
-            xfce4 xfce4-goodies x11vnc xvfb dbus-x11
+            xfce4 xfce4-goodies x11vnc xvfb dbus-x11 novnc websockify \
+            firefox
 
       - name: 🔗 Start headless XFCE in virtual display
         run: |
-          export DISPLAY=:1
-          Xvfb :1 -screen 0 1920x1080x24 &
+          export DISPLAY=:$DISPLAY_NUM
+          Xvfb :$DISPLAY_NUM -screen 0 1920x1080x24 &
           sleep 2
           startxfce4 &
           sleep 5
-          echo "startxfce4" | sudo tee /home/bullet/.xsession
-          sudo chown bullet:bullet /home/bullet/.xsession
+          echo "startxfce4" | sudo tee /home/$USERNAME/.xsession
+          sudo chown $USERNAME:$USERNAME /home/$USERNAME/.xsession
 
-      - name: 🔗 Start x11vnc (VNC access)
+      - name: 🔗 Start x11vnc & noVNC
         run: |
-          export DISPLAY=:1
-          # -shared permite múltiplos clientes conectarem
-          x11vnc -display :1 -nopw -forever -shared -rfbport 5900 &
+          export DISPLAY=:$DISPLAY_NUM
+          x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport $VNC_PORT &
+          websockify --web=/usr/share/novnc $NOVNC_PORT localhost:$VNC_PORT &
+
+      - name: 🔗 Install & connect Tailscale
+        shell: bash
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey ${{ inputs.ts_authkey }} --hostname bullet-linux --accept-dns=false
+          sleep 5
+          IP=$(tailscale ip -4 | head -n1)
+          echo "Use este IP para acessar:"
+          echo "VNC: $IP:$VNC_PORT"
+          echo "noVNC (browser): http://$IP:$NOVNC_PORT"
+          echo "Usuário Linux: $USERNAME"
+          echo "Senha Linux: $PASSWORD"
+
+      - name: ⏳ Keep alive
+        run: |
+          RUNTIME=${{ inputs.runtime_minutes }}
+          if [ "${{ inputs.test_mode }}" = "true" ]; then
+            RUNTIME=5
+          fi
+          END=$(( $(date +%s) + RUNTIME * 60 ))
+          while [ $(date +%s) -lt $END ]; do
+            LEFT=$(( (END - $(date +%s)) / 60 ))
+            echo "Linux VNC alive... ($LEFT min left)"
+            sleep 60
+          done
