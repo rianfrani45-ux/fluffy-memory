@@ -14,10 +14,6 @@ on:
         description: "Runtime em minutos (max 360; default 355)"
         required: false
         default: "355"
-      loops:
-        description: "Quantas vezes reiniciar workflow (0 = infinito)"
-        required: false
-        default: "0"
 
 concurrency:
   group: tailscale-linux-vnc
@@ -50,11 +46,16 @@ jobs:
           sudo apt update
           sudo DEBIAN_FRONTEND=noninteractive apt install -y \
             xfce4 xfce4-goodies x11vnc xvfb dbus-x11 novnc websockify \
-            firefox
+            firefox curl
 
-      - name: 🔗 Start headless XFCE in virtual display
+      - name: 🔗 Start Linux desktop + VNC + noVNC + Tailscale
+        shell: bash
         run: |
+          # --- Variáveis ---
           export DISPLAY=:$DISPLAY_NUM
+          echo "DISPLAY=$DISPLAY"
+
+          # --- Start virtual display e XFCE ---
           Xvfb :$DISPLAY_NUM -screen 0 1920x1080x24 &
           sleep 2
           startxfce4 &
@@ -62,31 +63,31 @@ jobs:
           echo "startxfce4" | sudo tee /home/$USERNAME/.xsession
           sudo chown $USERNAME:$USERNAME /home/$USERNAME/.xsession
 
-      - name: 🔗 Start x11vnc & noVNC
-        run: |
-          export DISPLAY=:$DISPLAY_NUM
+          # --- Start x11vnc e noVNC ---
           x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport $VNC_PORT &
           websockify --web=/usr/share/novnc $NOVNC_PORT localhost:$VNC_PORT &
 
-      - name: 🔗 Install & connect Tailscale
-        shell: bash
-        run: |
+          # --- Instala e conecta Tailscale ---
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey ${{ inputs.ts_authkey }} --hostname bullet-linux --accept-dns=false
           sleep 5
           IP=$(tailscale ip -4 | head -n1)
-          echo "Use este IP para acessar:"
+
+          # --- Mostra informações de acesso ---
+          echo "=============================="
+          echo "Acesse o Linux:"
           echo "VNC: $IP:$VNC_PORT"
           echo "noVNC (browser): http://$IP:$NOVNC_PORT"
-          echo "Usuário Linux: $USERNAME"
-          echo "Senha Linux: $PASSWORD"
+          echo "Usuário: $USERNAME"
+          echo "Senha: $PASSWORD"
+          echo "=============================="
 
-      - name: ⏳ Keep alive
-        run: |
+          # --- Mantém sessão viva ---
           RUNTIME=${{ inputs.runtime_minutes }}
           if [ "${{ inputs.test_mode }}" = "true" ]; then
             RUNTIME=5
           fi
+          echo "Runtime definido para $RUNTIME minutos"
           END=$(( $(date +%s) + RUNTIME * 60 ))
           while [ $(date +%s) -lt $END ]; do
             LEFT=$(( (END - $(date +%s)) / 60 ))
