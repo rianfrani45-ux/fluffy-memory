@@ -1,0 +1,51 @@
+name: Linux Desktop via Tailscale
+
+on:
+  workflow_dispatch:
+    inputs:
+      ts_authkey:
+        description: "Tailscale auth key"
+        required: true
+
+concurrency:
+  group: tailscale-linux-gui
+  cancel-in-progress: false
+
+jobs:
+  linux-gui:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+      - name: 🔧 Setup user
+        run: |
+          sudo useradd -m bullet
+          echo "bullet:Bullet@12345" | sudo chpasswd
+          sudo usermod -aG sudo bullet
+
+      - name: 🖥️ Install XFCE + XRDP
+        run: |
+          sudo apt update
+          sudo DEBIAN_FRONTEND=noninteractive apt install -y \
+            xfce4 xfce4-goodies xrdp dbus-x11 \
+            firefox
+
+          echo "xfce4-session" | sudo tee /home/bullet/.xsession
+          sudo chown bullet:bullet /home/bullet/.xsession
+
+          sudo systemctl enable xrdp
+          sudo systemctl restart xrdp
+
+      - name: 🔗 Install & connect Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up \
+            --authkey ${{ inputs.ts_authkey }} \
+            --hostname bullet-linux \
+            --accept-dns=false
+
+          tailscale ip -4
+
+      - name: ⏳ Keep alive
+        run: |
+          sleep 21500
