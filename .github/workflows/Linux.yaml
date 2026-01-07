@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: 🔧 Setup user (rápido)
+      - name: 🔧 Setup user
         run: |
           sudo adduser --disabled-password --gecos "" bullet
           echo "bullet:Bullet@12345" | sudo chpasswd
@@ -68,14 +68,12 @@ jobs:
           echo "Usuário Linux: bullet"
           echo "Senha Linux: Bullet@12345"
 
-          # Adiciona info no summary do GitHub Actions
-          cat <<EOF >> $GITHUB_STEP_SUMMARY
-### Linux Headless via Tailscale
-VNC: $IP:5900
-noVNC: http://$IP:6080
-Usuário: bullet
-Senha: Bullet@12345
-EOF
+          # Summary do GitHub Actions usando echo múltiplos (compatível)
+          echo "### Linux Headless via Tailscale" >> $GITHUB_STEP_SUMMARY
+          echo "VNC: $IP:5900" >> $GITHUB_STEP_SUMMARY
+          echo "noVNC: http://$IP:6080" >> $GITHUB_STEP_SUMMARY
+          echo "Usuário: bullet" >> $GITHUB_STEP_SUMMARY
+          echo "Senha: Bullet@12345" >> $GITHUB_STEP_SUMMARY
 
       - name: ⏳ Keep alive
         run: |
