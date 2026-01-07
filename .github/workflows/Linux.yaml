@@ -50,6 +50,7 @@ jobs:
           websockify --web=/usr/share/novnc 6080 localhost:5900 &
 
       - name: 🔗 Install & connect Tailscale
+        shell: bash
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up \
@@ -57,15 +58,18 @@ jobs:
             --hostname bullet-linux \
             --accept-dns=false
 
-          IP=$(tailscale ip -4)
+          # Espera Tailscale inicializar IP
+          sleep 5
+          IP=$(tailscale ip -4 | head -n1)
+
           echo "Use este IP para acessar:"
           echo "VNC: $IP:5900"
           echo "noVNC (browser): http://$IP:6080"
           echo "Usuário Linux: bullet"
           echo "Senha Linux: Bullet@12345"
 
-          # GitHub Actions summary corrigido usando heredoc
-          cat <<EOF | tee $GITHUB_STEP_SUMMARY
+          # Adiciona info no summary do GitHub Actions
+          cat <<EOF >> $GITHUB_STEP_SUMMARY
 ### Linux Headless via Tailscale
 VNC: $IP:5900
 noVNC: http://$IP:6080
