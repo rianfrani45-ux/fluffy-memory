@@ -17,9 +17,10 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: 🔧 Setup user
+      - name: 🔧 Setup user (rápido e confiável)
         run: |
-          sudo useradd -m bullet
+          # Cria usuário 'bullet' com senha
+          sudo adduser --disabled-password --gecos "" bullet
           echo "bullet:Bullet@12345" | sudo chpasswd
           sudo usermod -aG sudo bullet
 
@@ -27,12 +28,15 @@ jobs:
         run: |
           sudo apt update
           sudo DEBIAN_FRONTEND=noninteractive apt install -y \
-            xfce4 xfce4-goodies xrdp dbus-x11 \
-            firefox
+            xfce4 xfce4-goodies xrdp dbus-x11 firefox
 
-          echo "xfce4-session" | sudo tee /home/bullet/.xsession
+          # Corrige sessão para XRDP funcionar
+          echo "startxfce4" | sudo tee /home/bullet/.xsession
           sudo chown bullet:bullet /home/bullet/.xsession
+          sudo chmod 644 /home/bullet/.xsession
 
+          # Configura XRDP para usar Xorg
+          sudo sed -i 's/^#\?port=.*/port=3389/' /etc/xrdp/xrdp.ini
           sudo systemctl enable xrdp
           sudo systemctl restart xrdp
 
@@ -44,6 +48,7 @@ jobs:
             --hostname bullet-linux \
             --accept-dns=false
 
+          echo "Use este IP para conectar via RDP:"
           tailscale ip -4
 
       - name: ⏳ Keep alive
