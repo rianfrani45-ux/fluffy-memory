@@ -1,0 +1,42 @@
+name: Linux GUI via Tailscale
+
+on:
+  workflow_dispatch:
+
+jobs:
+  gui:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Instalar dependências
+        run: |
+          sudo apt update
+          sudo apt install -y xfce4 xfce4-goodies tightvncserver curl
+
+      - name: Instalar Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=github-gui
+
+      - name: Configurar VNC
+        run: |
+          mkdir -p ~/.vnc
+          echo "123456" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
+          echo '#!/bin/sh
+          unset SESSION_MANAGER
+          unset DBUS_SESSION_BUS_ADDRESS
+          exec startxfce4 &' > ~/.vnc/xstartup
+          chmod +x ~/.vnc/xstartup
+
+      - name: Iniciar VNC
+        run: |
+          vncserver -localhost no :1 -geometry 1280x720
+
+      - name: Mostrar IP Tailscale
+        run: |
+          tailscale ip -4
+          echo "Conecte via VNC na porta 5901"
+
+      - name: Manter ativo
+        run: sleep 21600
