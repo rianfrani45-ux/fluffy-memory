@@ -240,6 +240,22 @@ jobs:
 
 
 
+      - name: 🎨 Set Dark Wallpaper
+        run: |
+          $url = "https://4kwallpapers.com/images/wallpapers/macos-monterey-stock-black-dark-mode-layers-5k-6016x6016-5889.jpg"
+          $path = "$env:USERPROFILE\wallpaper.jpg"
+
+          Invoke-WebRequest -Uri $url -OutFile $path -UseBasicParsing
+
+          reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $path /f
+
+          RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
+
+      - name: 🌑 Force Dark Mode
+        run: |
+          reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme /t REG_DWORD /d 0 /f
+          reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v SystemUsesLightTheme /t REG_DWORD /d 0 /f
+      
       - name: 🧹 PURGE any devices containing 'bullet' (startup)
 
         run: |
