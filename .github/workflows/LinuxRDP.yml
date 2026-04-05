@@ -1,0 +1,75 @@
+name: Linux XFCE RDP (Tailscale)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+
+    - name: Update system
+      run: |
+        sudo apt update
+        sudo apt upgrade -y
+
+    # ----------------------------
+    # Install XFCE Desktop + XRDP
+    # ----------------------------
+    - name: Install XFCE + XRDP
+      run: |
+        sudo apt install xfce4 xfce4-goodies xrdp dbus-x11 -y
+
+        # Fix black screen
+        echo xfce4-session > ~/.xsession
+        chmod +x ~/.xsession
+
+        sudo sed -i '$i startxfce4' /etc/xrdp/startwm.sh
+        sudo adduser xrdp ssl-cert
+
+        sudo systemctl enable xrdp
+        sudo systemctl restart xrdp
+
+    # ----------------------------
+    # Create User
+    # ----------------------------
+    - name: Create RDP User
+      run: |
+        sudo useradd -m clouduser
+        echo "clouduser:123456" | sudo chpasswd
+        sudo usermod -aG sudo clouduser
+
+    # ----------------------------
+    # Install Tailscale
+    # ----------------------------
+    - name: Install Tailscale
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+
+    - name: Connect Tailscale
+      run: |
+        sudo tailscale up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=github-linux
+
+    # ----------------------------
+    # Show connection info
+    # ----------------------------
+    - name: Show RDP Info
+      run: |
+        echo "========== RDP READY =========="
+        echo "User: clouduser"
+        echo "Password: 123456"
+        echo "Tailscale IP:"
+        tailscale ip -4
+        echo "================================"
+
+    # ----------------------------
+    # Keep VM alive (6h max)
+    # ----------------------------
+    - name: Keep Alive
+      run: |
+        echo "VM running..."
+        while true; do
+          sleep 300
+        done
