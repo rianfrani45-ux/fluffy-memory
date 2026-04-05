@@ -1,75 +1,65 @@
-name: Linux XFCE RDP (Tailscale)
+name: Linux XFCE RDP (Tailscale Secure)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  linux-rdp:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
+      - name: Atualizar sistema
+        run: |
+          sudo apt update
+          sudo apt upgrade -y
 
-    - name: Update system
-      run: |
-        sudo apt update
-        sudo apt upgrade -y
+      - name: Instalar XFCE, XRDP e dependências
+        run: |
+          sudo apt install xfce4 xfce4-goodies xrdp dbus-x11 lightdm -y
 
-    # ----------------------------
-    # Install XFCE Desktop + XRDP
-    # ----------------------------
-    - name: Install XFCE + XRDP
-      run: |
-        sudo apt install xfce4 xfce4-goodies xrdp dbus-x11 -y
+          # Criar arquivo .xsession
+          echo "export XDG_CONFIG_DIRS=/etc/xdg" > ~/.xsession
+          echo "startxfce4" >> ~/.xsession
+          chmod +x ~/.xsession
 
-        # Fix black screen
-        echo xfce4-session > ~/.xsession
-        chmod +x ~/.xsession
+          # Corrigir startwm.sh do XRDP
+          sudo sed -i '$i startxfce4' /etc/xrdp/startwm.sh
+          sudo adduser xrdp ssl-cert
 
-        sudo sed -i '$i startxfce4' /etc/xrdp/startwm.sh
-        sudo adduser xrdp ssl-cert
+          # Garantir D-Bus ativo
+          sudo service dbus start
+          export $(dbus-launch)
 
-        sudo systemctl enable xrdp
-        sudo systemctl restart xrdp
+          # Habilitar e reiniciar XRDP
+          sudo systemctl enable xrdp
+          sudo systemctl restart xrdp
 
-    # ----------------------------
-    # Create User
-    # ----------------------------
-    - name: Create RDP User
-      run: |
-        sudo useradd -m clouduser
-        echo "clouduser:123456" | sudo chpasswd
-        sudo usermod -aG sudo clouduser
+      - name: Criar usuário RDP
+        run: |
+          sudo useradd -m clouduser
+          echo "clouduser:123456" | sudo chpasswd
+          sudo usermod -aG sudo clouduser
 
-    # ----------------------------
-    # Install Tailscale
-    # ----------------------------
-    - name: Install Tailscale
-      run: |
-        curl -fsSL https://tailscale.com/install.sh | sh
+      - name: Instalar Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
 
-    - name: Connect Tailscale
-      run: |
-        sudo tailscale up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=github-linux
+      - name: Conectar Tailscale
+        run: |
+          # Usa Auth Key segura do GitHub Secrets
+          sudo tailscale up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=github-linux
 
-    # ----------------------------
-    # Show connection info
-    # ----------------------------
-    - name: Show RDP Info
-      run: |
-        echo "========== RDP READY =========="
-        echo "User: clouduser"
-        echo "Password: 123456"
-        echo "Tailscale IP:"
-        tailscale ip -4
-        echo "================================"
+      - name: Mostrar IP e credenciais RDP
+        run: |
+          echo "===================================="
+          echo "RDP ready!"
+          echo "User: clouduser"
+          echo "Password: 123456"
+          echo "Tailscale IP:"
+          tailscale ip -4
+          echo "===================================="
 
-    # ----------------------------
-    # Keep VM alive (6h max)
-    # ----------------------------
-    - name: Keep Alive
-      run: |
-        echo "VM running..."
-        while true; do
-          sleep 300
-        done
+      - name: Manter VM ativa
+        run: |
+          while true; do sleep 300; done
