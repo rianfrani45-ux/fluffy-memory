@@ -273,14 +273,6 @@ jobs:
         run: |
           choco install notion -y
 
-      - name: ☕ Install OpenJDK
-        run: |
-          choco install openjdk21 -y
-
-      - name: 🧠 Install IntelliJ
-        run: |
-          choco install intellijidea-community -y
-
       - name: ⚙️ Taskbar Tweaks
         run: |
           reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 1 /f
