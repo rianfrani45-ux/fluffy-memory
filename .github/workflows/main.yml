@@ -1,7 +1,5 @@
 name: Windows RDP via Tailscale (A)
 
-
-
 on:
 
   workflow_dispatch:
@@ -255,7 +253,38 @@ jobs:
         run: |
           reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme /t REG_DWORD /d 0 /f
           reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v SystemUsesLightTheme /t REG_DWORD /d 0 /f
-      
+
+     - name: 🖼️ Download Custom Wallpaper
+        run: |
+          $url = "https://drive.google.com/uc?export=download&id=1w7WdiWp47BDRa6GxriW3xBhAMfMolnrd"
+          $path = "$env:USERPROFILE\wallpaper.jpg"
+          Invoke-WebRequest -Uri $url -OutFile $path -UseBasicParsing
+
+          reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $path /f
+          RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
+
+      - name: 💻 Install VSCode
+        run: |
+          choco install vscode -y
+
+      - name: 📝 Install Notion
+        run: |
+          choco install notion -y
+
+      - name: ☕ Install OpenJDK
+        run: |
+          choco install openjdk21 -y
+
+      - name: 🧠 Install IntelliJ
+        run: |
+          choco install intellijidea-community -y
+
+      - name: ⚙️ Taskbar Tweaks
+        run: |
+          reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 1 /f
+          Stop-Process -Name explorer -Force
+          Start-Process explorer
+          
       - name: 🧹 PURGE any devices containing 'bullet' (startup)
 
         run: |
@@ -329,7 +358,6 @@ jobs:
           "### RDP (A)`nHost: $env:TS_HOSTNAME`nIPv4: $ip4`nMagicDNS: $fqdn`nDERP: $derp`nUser: $env:RDP_USER`nPass: $env:RDP_PASS" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
 
-
       - name: ⏳ Keep alive
 
         run: |
@@ -347,8 +375,6 @@ jobs:
             Start-Sleep -Seconds 60
 
           }
-
-
 
       - name: 🧹 PURGE any devices containing 'bullet' (exit)
 
