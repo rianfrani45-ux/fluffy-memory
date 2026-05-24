@@ -237,7 +237,11 @@ jobs:
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop" | Out-Null
 
 
-
+      - name: Improve RDP Resolution
+        shell: powershell
+        run: |
+         choco install qres -y
+         QRes.exe /x 2560 /y 1440
       - name: 🎨 Set Dark Wallpaper
         run: |
           $url = "https://4kwallpapers.com/images/wallpapers/macos-monterey-stock-black-dark-mode-layers-5k-6016x6016-5889.jpg"
